@@ -345,7 +345,7 @@
                     </div>
                     <div>
                         <span class="text-xs text-slate-400 font-medium block">Climat & Période</span>
-                        <span id="summary-climate-title" class="text-sm font-bold text-white">Chaud & Ensoleillé</span>
+                        <span id="summary-climate-title" class="text-sm font-bold text-white">Climat & Saison</span>
                         <p id="summary-climate-desc" class="text-xs text-slate-400 mt-0.5">28-34°C • Idéal avant mousson</p>
                     </div>
                 </div>
@@ -861,7 +861,27 @@
             document.getElementById('flight-duration-text').textContent = data.flightDetails?.totalDuration || '12h-24h';
 
             // Climate & Practical Tips
-            document.getElementById('climate-synthesis-content').innerHTML = `<p>${data.climateAndBestTime || ''}</p>`;
+           const climateText = data.climateAndBestTime || '';
+document.getElementById('climate-synthesis-content').innerHTML = `<p>${climateText}</p>`;
+
+// Mettre à jour le badge météo dynamiquement selon le texte
+const titleBadge = document.getElementById('summary-climate-title');
+if (titleBadge) {
+    let badgeText = "Climat & Saison";
+    const lower = climateText.toLowerCase();
+    
+    if (lower.includes('frais') || lower.includes('froid') || lower.includes('neige') || lower.includes('hiver') || lower.includes('3°c') || lower.includes('5°c') || lower.includes('9°c')) {
+        badgeText = "Frais & Saisonnier";
+    } else if (lower.includes('pluie') || lower.includes('humide') || lower.includes('averse')) {
+        badgeText = "Humide & Nuageux";
+    } else if (lower.includes('chaud') || lower.includes('soleil') || lower.includes('été') || lower.includes('25°c') || lower.includes('30°c')) {
+        badgeText = "Chaud & Ensoleillé";
+    } else if (lower.includes('doux') || lower.includes('agréable') || lower.includes('tempéré')) {
+        badgeText = "Doux & Cléments";
+    }
+    
+    titleBadge.textContent = badgeText;
+}
             
             const tipsContainer = document.getElementById('practical-tips-content');
             tipsContainer.innerHTML = '';
