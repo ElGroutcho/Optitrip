@@ -1263,7 +1263,6 @@ if (titleBadge) {
             };
 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
             try {
                 // Exponential backoff fetch
                 const response = await fetchWithRetry(apiUrl, {
