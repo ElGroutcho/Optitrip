@@ -849,24 +849,7 @@
             // Summary cards
             document.getElementById('summary-flight-dur').textContent = data.flightDetails?.totalDuration || '~15h-25h';
             
-            // Mise à jour dynamique du titre et de l'icône selon le mode de transport
-const transportTextElem = document.getElementById('transport-title-text');
-const transportIconElem = document.getElementById('transport-icon');
-
-if (transportTextElem && transportIconElem) {
-    const fullContent = (JSON.stringify(data.flightDetails || data.transport || '')).toLowerCase();
-
-    if (fullContent.includes('voiture') || fullContent.includes('auto') || fullContent.includes('véhicule') || fullContent.includes('route')) {
-        transportTextElem.textContent = "Détails du Trajet Routier";
-        transportIconElem.setAttribute('data-lucide', 'car');
-    } else if (fullContent.includes('train') || fullContent.includes('tgv') || fullContent.includes('rail')) {
-        transportTextElem.textContent = "Détails du Trajet en Train";
-        transportIconElem.setAttribute('data-lucide', 'train');
-    } else {
-        transportTextElem.textContent = "Détails des Vols Optimisés";
-        transportIconElem.setAttribute('data-lucide', 'plane');
-    }
-
+            
     // Rafraîchit les icônes à l'écran
     if (window.lucide) {
         lucide.createIcons();
