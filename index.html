@@ -326,18 +326,17 @@
                     </div>
                 </div>
 
-                <!-- Jetlag & Timezone -->
-                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
-                    <div class="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        <i data-lucide="clock" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <span class="text-xs text-slate-400 font-medium block">Décalage Horaire</span>
-                        <span id="summary-jetlag" class="text-sm font-bold text-white">+6 Heures (UTC+8)</span>
-                        <p class="text-xs text-slate-400 mt-0.5">Adaptation ~2-3 jours</p>
-                    </div>
-                </div>
-
+               <!-- Jetlag & Timezone -->
+<div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
+    <div class="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <i data-lucide="clock" class="w-5 h-5"></i>
+    </div>
+    <div>
+        <span class="text-xs text-slate-400 font-medium block">Décalage Horaire</span>
+        <span id="summary-jetlag" class="text-sm font-bold text-white">0h</span>
+        <p id="summary-jetlag-advice" class="text-xs text-slate-400 mt-0.5">Aucun jet-lag</p>
+    </div>
+</div>
                 <!-- Weather & Season -->
                 <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
                     <div class="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -850,7 +849,25 @@
             // Summary cards
             document.getElementById('summary-flight-dur').textContent = data.flightDetails?.totalDuration || '~15h-25h';
             document.getElementById('summary-flight-layover').textContent = data.flightDetails?.layovers || 'Vols sélectionnés';
-            document.getElementById('summary-jetlag').textContent = data.flightDetails?.jetlag || 'Variable';
+            // Mise à jour dynamique du Jetlag et du conseil
+const jetlagValue = data.timeZoneDifference || data.jetlag || "0h";
+document.getElementById('summary-jetlag').textContent = jetlagValue;
+
+const adviceElem = document.getElementById('summary-jetlag-advice');
+if (adviceElem) {
+    // Extraction du nombre d'heures (ex: "+6h" -> 6, "-3h" -> 3)
+    const hours = Math.abs(parseInt(jetlagValue) || 0);
+    
+    if (hours === 0) {
+        adviceElem.textContent = "Aucun jet-lag";
+    } else if (hours <= 3) {
+        adviceElem.textContent = "Adaptation facile (~1 jour)";
+    } else if (hours <= 6) {
+        adviceElem.textContent = "Adaptation modérée (~2 jours)";
+    } else {
+        adviceElem.textContent = "Adaptation ~3-4 jours";
+    }
+}
             document.getElementById('summary-climate-desc').textContent = data.climateAndBestTime || 'Excellente saison';
             document.getElementById('summary-budget').textContent = data.budgetEstimate || 'Sur devis';
 
