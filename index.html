@@ -854,6 +854,7 @@
     if (window.lucide) {
         lucide.createIcons();
     }
+}
             document.getElementById('summary-flight-layover').textContent = data.flightDetails?.layovers || 'Vols sélectionnés';
             // Mise à jour dynamique du Jetlag et du conseil
 const jetlagValue = data.timeZoneDifference || data.jetlag || "0h";
@@ -1262,7 +1263,8 @@ if (titleBadge) {
                 }
             };
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
             try {
                 // Exponential backoff fetch
                 const response = await fetchWithRetry(apiUrl, {
@@ -1382,7 +1384,7 @@ if (titleBadge) {
                 list.appendChild(el);
             });
             lucide.createIcons();
-        }
+       
 
         function loadSavedTripById(id) {
             const saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
