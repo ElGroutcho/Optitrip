@@ -1,3 +1,48 @@
+
+Skip to content
+
+    ElGroutcho
+    Optitrip
+
+Repository navigation
+
+    Code
+    Issues
+    Pull requests
+    Agents
+    Actions
+    Projects
+    Wiki
+    Security and quality
+    Insights
+    Settings
+
+Commit 2948204
+ElGroutcho
+ElGroutcho
+authored
+1 hour ago
+··
+Verified
+Update print statement from 'Hello' to 'Goodbye'
+main
+
+1 parent 
+4c05fd9
+ commit 
+2948204
+
+1 file changed
++1-1Lines changed: 1 addition & 1 deletion
+File tree
+
+    index.html
+
+ 
+‎index.html‎
++1-1Lines changed: 1 addition & 1 deletion
+Original file line number	Diff line number	Diff line change
+@@ -1,1417 +1,1417 @@
 <!DOCTYPE html>
 <html lang="fr" class="h-full bg-slate-900 text-slate-100">
 <head>
@@ -11,7 +56,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -246,7 +291,7 @@
             <div id="input-tab-prompt" class="hidden space-y-3">
                 <label class="block text-xs font-semibold text-slate-300">Décrivez votre projet de voyage en langage naturel :</label>
                 <textarea id="free-prompt-text" rows="4" placeholder="Exemple : Je veux partir 2 semaines au départ de Paris vers le Japon en mai. Je souhaite voir les cerisiers si possible, visiter Tokyo et Kyoto, avec un rythme moyen et un budget confortable. Intègre des suggestions de vols et d'étapes gourmandes." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 focus:outline-none focus:border-brand-500"></textarea>
-                
+
                 <!-- Quick Suggestion Badges -->
                 <div class="flex flex-wrap gap-2 pt-1">
                     <span class="text-xs text-slate-500 flex items-center mr-1">Idées rapides :</span>
@@ -375,6 +420,7 @@
                     </button>
                     <button id="view-tab-flights" onclick="switchResultTab('flights')" class="py-3 px-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-semibold text-sm flex items-center space-x-2 whitespace-nowrap">
                         <i data-lucide="plane" class="w-4 h-4"></i>
+                        <span>Synthèse Trajets & Logistique</span>
                         <span>Synthèse Vols & Logistique</span>
                     </button>
                 </nav>
@@ -408,7 +454,7 @@
                             <span class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full" id="map-stops-count">0 étapes</span>
                         </div>
                         <p class="text-xs text-slate-400 mb-3">Cliquez sur un jour pour focaliser la carte sur l'étape correspondante :</p>
-                        
+
                         <div id="map-sidebar-list" class="space-y-2 overflow-y-auto flex-grow pr-1">
                             <!-- Populated dynamically -->
                         </div>
@@ -468,7 +514,7 @@
     <i id="transport-icon" data-lucide="plane" class="w-5 h-5 text-brand-400 mr-2"></i>
     <span id="transport-title-text">Détails des Transports Optimisés</span>
 </h3>
-                        
+
                         <div class="space-y-3 text-xs sm:text-sm">
                             <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
                                 <span class="text-xs font-bold text-brand-400 uppercase tracking-wide block mb-1">Vol Aller</span>
@@ -497,7 +543,7 @@
                             <i data-lucide="sun-medium" class="w-5 h-5 text-amber-400 mr-2"></i>
                             Climat & Arbitrage des Dates
                         </h3>
-                        
+
                         <div id="climate-synthesis-content" class="text-xs sm:text-sm text-slate-300 leading-relaxed space-y-2">
                             <!-- Populated dynamically -->
                         </div>
@@ -760,7 +806,7 @@
         window.onload = function () {
             lucide.createIcons();
             updateApiKeyUI();
-            
+
             // Auto-load Demo Trip on startup for rich initial rendering
             loadTripData(DEMO_TRIP_DATA);
         };
@@ -848,8 +894,8 @@
 
             // Summary cards
             document.getElementById('summary-flight-dur').textContent = data.flightDetails?.totalDuration || '~15h-25h';
-            
-            
+
+
     // Rafraîchit les icônes à l'écran
     if (window.lucide) {
         lucide.createIcons();
@@ -864,7 +910,7 @@ const adviceElem = document.getElementById('summary-jetlag-advice');
 if (adviceElem) {
     // Extraction du nombre d'heures (ex: "+6h" -> 6, "-3h" -> 3)
     const hours = Math.abs(parseInt(jetlagValue) || 0);
-    
+
     if (hours === 0) {
         adviceElem.textContent = "Aucun jet-lag";
     } else if (hours <= 3) {
@@ -893,7 +939,7 @@ const titleBadge = document.getElementById('summary-climate-title');
 if (titleBadge) {
     let badgeText = "Climat & Saison";
     const lower = climateText.toLowerCase();
-    
+
     if (lower.includes('frais') || lower.includes('froid') || lower.includes('neige') || lower.includes('hiver') || lower.includes('3°c') || lower.includes('5°c') || lower.includes('9°c')) {
         badgeText = "Frais & Saisonnier";
     } else if (lower.includes('pluie') || lower.includes('humide') || lower.includes('averse')) {
@@ -903,10 +949,10 @@ if (titleBadge) {
     } else if (lower.includes('doux') || lower.includes('agréable') || lower.includes('tempéré')) {
         badgeText = "Doux & Cléments";
     }
-    
+
     titleBadge.textContent = badgeText;
 }
-            
+
             const tipsContainer = document.getElementById('practical-tips-content');
             tipsContainer.innerHTML = '';
             const tipsList = data.localEvents || [
@@ -966,7 +1012,6 @@ if (titleBadge) {
                             <span>Voir sur la carte</span>
                         </button>
                     </div>
-
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs sm:text-sm pt-1">
                         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
                             <span class="font-bold text-amber-400 flex items-center mb-1">
@@ -987,7 +1032,6 @@ if (titleBadge) {
                             <p class="text-slate-300 leading-relaxed">${item.evening}</p>
                         </div>
                     </div>
-
                     ${item.logisticsNote ? `
                     <div class="bg-brand-950/30 border border-brand-500/20 p-2.5 rounded-xl text-xs text-brand-300 flex items-start space-x-2">
                         <i data-lucide="info" class="w-4 h-4 text-brand-400 shrink-0 mt-0.5"></i>
@@ -1080,7 +1124,7 @@ if (titleBadge) {
                 `;
 
                 marker.bindPopup(popupContent);
-                
+
                 marker.on('click', () => {
                     highlightSidebarDay(item.day);
                 });
@@ -1334,7 +1378,7 @@ if (titleBadge) {
         function saveCurrentTrip() {
             if (!currentTripData) return;
             let saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
-            
+
             // Check if already saved
             const exists = saved.some(t => t.title === currentTripData.title);
             if (!exists) {
@@ -1384,7 +1428,7 @@ if (titleBadge) {
                 list.appendChild(el);
             });
             lucide.createIcons();
-       
+        }
 
         function loadSavedTripById(id) {
             const saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
@@ -1415,3 +1459,10 @@ if (titleBadge) {
     </script>
 </body>
 </html>
+0 commit comments
+Comments
+0 (0)
+Comment
+
+You're not receiving notifications from this thread.
+There are no files selected for viewing
