@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptiTrip - Planificateur & Optimiseur de Voyages IA</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        accent: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* Leaflet Custom Styling */
+        .leaflet-container {
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+        .custom-marker {
+            background-color: #4f46e5;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s ease, background-color 0.2s;
+        }
+        .custom-marker.active {
+            background-color: #22c55e;
+            transform: scale(1.3);
+            z-index: 1000 !important;
+        }
+        .start-marker {
+            background-color: #ef4444;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        /* Print CSS optimization */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-clean {
+                background: white !important;
+                color: black !important;
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+            }
+            #map-container {
+                height: 400px !important;
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+
+    <!-- HEADER NAVBAR -->
+    <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="resetToHome()">
+                <div class="bg-gradient-to-tr from-brand-600 to-accent-600 p-2 rounded-xl text-white shadow-lg shadow-brand-500/20">
+                    <i data-lucide="compass" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span class="text-xl font-extrabold bg-gradient-to-r from-white via-slate-200 to-brand-400 bg-clip-text text-transparent">OptiTrip</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 font-semibold ml-1">IA 3.0</span>
+                </div>
+            </div>
+
+            <!-- Header Quick Controls -->
+            <div class="flex items-center space-x-3">
+                <button onclick="loadDemoTrip()" class="flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs sm:text-sm shadow-md transition-all transform hover:scale-105">
+                    <i data-lucide="zap" class="w-4 h-4 fill-slate-950"></i>
+                    <span>Démo Express</span>
+                </button>
+
+                <button onclick="toggleApiKeyModal()" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition">
+                    <i data-lucide="key" class="w-3.5 h-3.5 text-brand-400"></i>
+                    <span id="api-key-status-text">Clé API</span>
+                </button>
+
+                <button onclick="toggleSavedTripsModal()" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition">
+                    <i data-lucide="bookmark" class="w-3.5 h-3.5 text-accent-500"></i>
+                    <span class="hidden sm:inline">Mes Voyages</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <!-- SECTION 1: TRIP GENERATOR FORM / PROMPT INPUT -->
+        <section id="generator-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300">
+            <div class="max-w-3xl mx-auto text-center mb-6">
+                <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
+                    Où souhaitez-vous aller ensuite ?
+                </h1>
+                <p class="text-sm sm:text-base text-slate-400">
+                    L'IA conçoit votre itinéraire complet, vos vols optimisés et génère votre carte interactive personnalisée en quelques secondes.
+                </p>
+            </div>
+
+            <!-- Dual Input Tabs Header -->
+            <div class="flex justify-center mb-6">
+                <div class="bg-slate-950 p-1 rounded-xl border border-slate-800 flex space-x-1">
+                    <button id="tab-btn-form" onclick="switchInputTab('form')" class="px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-md">
+                        <i data-lucide="sliders" class="w-4 h-4 inline-block mr-1"></i> Formulaire Guidé
+                    </button>
+                    <button id="tab-btn-prompt" onclick="switchInputTab('prompt')" class="px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-400 hover:text-white">
+                        <i data-lucide="message-square" class="w-4 h-4 inline-block mr-1"></i> Saisie Libre (Prompt)
+                    </button>
+                </div>
+            </div>
+
+            <!-- INPUT TAB 1: FORMULAIRE GUIDÉ -->
+            <div id="input-tab-form" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Ville de Départ -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Ville / Aéroport de départ</label>
+                        <div class="relative">
+                            <i data-lucide="plane-departure" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                            <input type="text" id="form-departure" value="Paris CDG" placeholder="ex: Paris, Lyon, Bruxelles..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                        </div>
+                    </div>
+
+                    <!-- Destinations Multiples -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Destinations souhaitées (séparées par une virgule)</label>
+                        <div class="relative">
+                            <i data-lucide="map-pin" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                            <input type="text" id="form-destinations" value="Singapour, Siem Reap, Phnom Penh" placeholder="ex: Tokyo, Kyoto, Osaka ou Rome, Florence" class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                        </div>
+                    </div>
+
+                    <!-- Type de Dates -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Flexibilité des Dates</label>
+                        <select id="form-date-type" onchange="toggleDateInputs()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="fixed">Dates Fixes</option>
+                            <option value="flexible" selected>Dates Flexibles (Meilleure période)</option>
+                        </select>
+                    </div>
+
+                    <!-- Période / Dates -->
+                    <div id="date-input-container">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Période visée</label>
+                        <input type="text" id="form-dates-text" value="Avril 2025 (11 au 25 avril)" placeholder="ex: 10 au 24 Juillet ou Printemps 2025" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                    </div>
+
+                    <!-- Durée -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Durée globale (jours)</label>
+                        <input type="number" id="form-duration" value="14" min="1" max="60" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                    </div>
+
+                    <!-- Style de Voyage -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Style de voyage principal</label>
+                        <select id="form-style" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="équilibré">Équilibré (Culture, nature & détente)</option>
+                            <option value="aventure">Aventure & Incontournables</option>
+                            <option value="gastronomie">Gastronomie & Culture locale</option>
+                            <option value="relaxation">Relaxation & Rythme doux</option>
+                            <option value="backpack">Backpacker & Économique</option>
+                            <option value="luxe">Luxe & Confort absolu</option>
+                        </select>
+                    </div>
+
+                    <!-- Budget / Compagnons -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Budget / Voyageurs</label>
+                        <select id="form-budget" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="moyen">Budget Moyen (~150€/jour/pers.)</option>
+                            <option value="economique">Économique / Petit budget</option>
+                            <option value="eleve">Élevé / Premium</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Groupe</label>
+                        <select id="form-group" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="couple">En Couple</option>
+                            <option value="solo">Solo</option>
+                            <option value="famille">En Famille avec Enfants</option>
+                            <option value="amis">Entre Amis</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INPUT TAB 2: PROMPT SAISIE LIBRE -->
+            <div id="input-tab-prompt" class="hidden space-y-3">
+                <label class="block text-xs font-semibold text-slate-300">Décrivez votre projet de voyage en langage naturel :</label>
+                <textarea id="free-prompt-text" rows="4" placeholder="Exemple : Je veux partir 2 semaines au départ de Paris vers le Japon en mai. Je souhaite voir les cerisiers si possible, visiter Tokyo et Kyoto, avec un rythme moyen et un budget confortable. Intègre des suggestions de vols et d'étapes gourmandes." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 focus:outline-none focus:border-brand-500"></textarea>
+                
+                <!-- Quick Suggestion Badges -->
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <span class="text-xs text-slate-500 flex items-center mr-1">Idées rapides :</span>
+                    <button type="button" onclick="setPromptIdea('10 jours roadtrip en Islande au départ de Lyon avec aurores boréales et cascades.')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700 transition">🇮🇸 Roadtrip Islande 10j</button>
+                    <button type="button" onclick="setPromptIdea('15 jours entre Bangkok, Chiang Mai et les îles de Thaïlande depuis Marseille en novembre.')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700 transition">🇹🇭 Thaïlande 15j</button>
+                    <button type="button" onclick="setPromptIdea('Weekend de 4 jours à Rome au départ de Bruxelles, spécial histoire et gastronomie.')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700 transition">🇮🇹 Weekend Rome 4j</button>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-slate-800 gap-3">
+                <div class="text-xs text-slate-400 flex items-center">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-brand-500 mr-1.5"></i>
+                    <span>Mode sans clé limité ou utilisez votre clé Gemini gratuite.</span>
+                </div>
+                <button onclick="generateItinerary()" id="generate-btn" class="w-full sm:w-auto bg-gradient-to-r from-brand-600 via-brand-500 to-accent-600 hover:from-brand-500 hover:to-accent-500 text-white font-bold px-8 py-3 rounded-xl shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2 transition transform hover:-translate-y-0.5">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    <span>Générer mon Voyage sur Mesure</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- LOADING SPINNER & STATUS -->
+        <div id="loading-spinner" class="hidden my-12 text-center space-y-4">
+            <div class="inline-block relative w-16 h-16">
+                <div class="absolute top-0 left-0 w-full h-full border-4 border-brand-500/20 rounded-full"></div>
+                <div class="absolute top-0 left-0 w-full h-full border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                <i data-lucide="plane" class="w-6 h-6 text-brand-400 absolute inset-0 m-auto"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white" id="loading-status-title">Création de votre itinéraire IA...</h3>
+                <p class="text-sm text-slate-400 mt-1" id="loading-status-sub">Calcul des itinéraires de vol, des escales, du climat et placement des repères sur la carte...</p>
+            </div>
+        </div>
+
+        <!-- SECTION 2: TRIP RESULTS CONTAINER (Hidden by default until generated or demo loaded) -->
+        <section id="results-section" class="hidden space-y-6">
+
+            <!-- Trip Header Banner -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+                <div>
+                    <div class="flex items-center space-x-2 text-xs font-semibold text-brand-400 uppercase tracking-wider mb-1">
+                        <span id="trip-badge-dates">11 - 25 Avril • 14 Jours</span>
+                        <span>•</span>
+                        <span id="trip-badge-style">Équilibré</span>
+                    </div>
+                    <h2 id="trip-title" class="text-2xl sm:text-3xl font-extrabold text-white">Évasion Asiatique : Singapour & Cambodge</h2>
+                    <p id="trip-route-subtitle" class="text-sm text-slate-400 mt-1 flex items-center">
+                        <i data-lucide="navigation" class="w-3.5 h-3.5 text-accent-500 mr-1.5"></i>
+                        Départ de <span id="trip-dep-city" class="text-slate-200 font-medium ml-1 mr-1">Paris CDG</span> ➔ <span id="trip-dest-cities" class="text-slate-200 font-medium ml-1">Singapour, Siem Reap, Phnom Penh</span>
+                    </p>
+                </div>
+
+                <div class="flex items-center space-x-2 no-print">
+                    <button onclick="saveCurrentTrip()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition">
+                        <i data-lucide="bookmark-plus" class="w-4 h-4 text-brand-400"></i>
+                        <span>Sauvegarder</span>
+                    </button>
+                    <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition">
+                        <i data-lucide="printer" class="w-4 h-4 text-accent-400"></i>
+                        <span>Imprimer / PDF</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top Summary Cards Grid (Flight synthesis & Jetlag) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Flight Outbound/Inbound -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
+                    <div class="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <i data-lucide="plane-takeoff" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium block">Vols & Trajet</span>
+                        <span id="summary-flight-dur" class="text-sm font-bold text-white">~28h Total (A/R)</span>
+                        <p id="summary-flight-layover" class="text-xs text-slate-400 mt-0.5">Vol direct aller • 1 escale retour</p>
+                    </div>
+                </div>
+
+                <!-- Jetlag & Timezone -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
+                    <div class="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <i data-lucide="clock" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium block">Décalage Horaire</span>
+                        <span id="summary-jetlag" class="text-sm font-bold text-white">+6 Heures (UTC+8)</span>
+                        <p class="text-xs text-slate-400 mt-0.5">Adaptation ~2-3 jours</p>
+                    </div>
+                </div>
+
+                <!-- Weather & Season -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
+                    <div class="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <i data-lucide="sun" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium block">Climat & Période</span>
+                        <span id="summary-climate-title" class="text-sm font-bold text-white">Chaud & Ensoleillé</span>
+                        <p id="summary-climate-desc" class="text-xs text-slate-400 mt-0.5">28-34°C • Idéal avant mousson</p>
+                    </div>
+                </div>
+
+                <!-- Budget Synthesis -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-start space-x-3">
+                    <div class="p-2.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        <i data-lucide="wallet" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium block">Budget Estimé Global</span>
+                        <span id="summary-budget" class="text-sm font-bold text-white">~2 200 € / pers.</span>
+                        <p class="text-xs text-slate-400 mt-0.5">Vols, logements & activités incl.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESULTS NAVIGATION TABS -->
+            <div class="border-b border-slate-800 no-print">
+                <nav class="flex space-x-6 overflow-x-auto pb-1" aria-label="Tabs">
+                    <button id="view-tab-map" onclick="switchResultTab('map')" class="py-3 px-1 border-b-2 border-brand-500 text-brand-400 font-bold text-sm flex items-center space-x-2 whitespace-nowrap">
+                        <i data-lucide="map" class="w-4 h-4"></i>
+                        <span>Carte Interactive du Voyage</span>
+                    </button>
+                    <button id="view-tab-planning" onclick="switchResultTab('planning')" class="py-3 px-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-semibold text-sm flex items-center space-x-2 whitespace-nowrap">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span>Planning Détaillé Segmenté</span>
+                    </button>
+                    <button id="view-tab-flights" onclick="switchResultTab('flights')" class="py-3 px-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-semibold text-sm flex items-center space-x-2 whitespace-nowrap">
+                        <i data-lucide="plane" class="w-4 h-4"></i>
+                        <span>Synthèse Vols & Logistique</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- TAB CONTENT 1: MAP TAB -->
+            <div id="content-tab-map" class="space-y-4">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Map Box -->
+                    <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-xl relative">
+                        <div id="map-container" class="w-full h-[500px] lg:h-[600px] rounded-xl overflow-hidden"></div>
+                        <div class="absolute top-4 right-4 z-[400] bg-slate-900/90 border border-slate-700 rounded-lg p-2 text-xs backdrop-blur space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+                                <span class="text-slate-300">Départ / Arrivée</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="w-3 h-3 rounded-full bg-indigo-600 inline-block"></span>
+                                <span class="text-slate-300">Étapes & Visites</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Timeline Sidebar for Map -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-[500px] lg:h-[600px]">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                            <h3 class="font-bold text-white text-base flex items-center">
+                                <i data-lucide="list-ordered" class="w-4 h-4 text-brand-400 mr-2"></i>
+                                Étapes du parcours
+                            </h3>
+                            <span class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full" id="map-stops-count">0 étapes</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-3">Cliquez sur un jour pour focaliser la carte sur l'étape correspondante :</p>
+                        
+                        <div id="map-sidebar-list" class="space-y-2 overflow-y-auto flex-grow pr-1">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT 2: PLANNING VIEW -->
+            <div id="content-tab-planning" class="hidden space-y-4">
+                <!-- Planning Sub-Controls (Card view vs Table View) -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3 rounded-xl no-print">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-semibold text-slate-400">Mode d'affichage :</span>
+                        <button id="plan-mode-cards-btn" onclick="togglePlanViewMode('cards')" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-semibold shadow">Cards</button>
+                        <button id="plan-mode-table-btn" onclick="togglePlanViewMode('table')" class="px-3 py-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-lg text-xs font-semibold">Tableau (Impression)</button>
+                    </div>
+
+                    <div class="relative w-full sm:w-64">
+                        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400"></i>
+                        <input type="text" id="filter-day-input" onkeyup="filterItineraryDays()" placeholder="Filtrer un jour ou activité..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- View 1: Card View -->
+                <div id="itinerary-cards-view" class="space-y-4">
+                    <!-- Cards populated via JS -->
+                </div>
+
+                <!-- View 2: Table View (Print Optimized) -->
+                <div id="itinerary-table-view" class="hidden bg-slate-900 border border-slate-800 rounded-xl overflow-hidden print-clean">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-slate-950 text-slate-300 font-bold border-b border-slate-800 uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="p-3 w-16">Jour</th>
+                                    <th class="p-3 w-48">Lieu / Étape</th>
+                                    <th class="p-3">Matin</th>
+                                    <th class="p-3">Midi & Après-Midi</th>
+                                    <th class="p-3">Soir</th>
+                                    <th class="p-3 w-48">Conseil / Logistique</th>
+                                </tr>
+                            </thead>
+                            <tbody id="itinerary-table-body" class="divide-y divide-slate-800/60">
+                                <!-- Table rows populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT 3: VOLS & LOGISTIQUE -->
+            <div id="content-tab-flights" class="hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Flight Detail Card -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                        <h3 class="text-base font-bold text-white flex items-center">
+                            <i data-lucide="plane" class="w-5 h-5 text-brand-400 mr-2"></i>
+                            Détails des Vols Optimisés
+                        </h3>
+                        
+                        <div class="space-y-3 text-xs sm:text-sm">
+                            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                <span class="text-xs font-bold text-brand-400 uppercase tracking-wide block mb-1">Vol Aller</span>
+                                <p id="flight-outbound-text" class="text-slate-200">Chargement...</p>
+                            </div>
+                            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                <span class="text-xs font-bold text-accent-400 uppercase tracking-wide block mb-1">Vol Retour</span>
+                                <p id="flight-inbound-text" class="text-slate-200">Chargement...</p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <span class="text-xs text-slate-400 block">Escales probables</span>
+                                    <span id="flight-layovers-text" class="font-semibold text-white">Direct / 1 escale</span>
+                                </div>
+                                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <span class="text-xs text-slate-400 block">Temps de Trajet</span>
+                                    <span id="flight-duration-text" class="font-semibold text-white">~13h aller</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Climate & Arbitrage Card -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                        <h3 class="text-base font-bold text-white flex items-center">
+                            <i data-lucide="sun-medium" class="w-5 h-5 text-amber-400 mr-2"></i>
+                            Climat & Arbitrage des Dates
+                        </h3>
+                        
+                        <div id="climate-synthesis-content" class="text-xs sm:text-sm text-slate-300 leading-relaxed space-y-2">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Practical Tips & Events -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <h3 class="text-base font-bold text-white flex items-center">
+                        <i data-lucide="sparkle" class="w-5 h-5 text-purple-400 mr-2"></i>
+                        Événements Locaux & Recommandations Logistiques
+                    </h3>
+                    <div id="practical-tips-content" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- MODAL API KEY -->
+    <div id="modal-apikey" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center">
+                    <i data-lucide="key" class="w-5 h-5 text-brand-400 mr-2"></i>
+                    Clé API Gemini (Gratuite)
+                </h3>
+                <button onclick="toggleApiKeyModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Entrez votre propre clé Google Gemini pour générer des trajets sur mesure sans aucune restriction. La clé est enregistrée localement dans votre navigateur.
+            </p>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Votre Clé Gemini API</label>
+                <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="saveApiKey()" class="bg-brand-600 hover:bg-brand-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SAVED TRIPS -->
+    <div id="modal-saved-trips" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center">
+                    <i data-lucide="bookmark" class="w-5 h-5 text-accent-400 mr-2"></i>
+                    Mes Voyages Sauvegardés
+                </h3>
+                <button onclick="toggleSavedTripsModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="saved-trips-list" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-900/60 border-t border-slate-800 py-4 mt-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            OptiTrip - Optimiseur & Planificateur de Voyages IA © 2026 • Propulsé par Gemini 3 Flash & Leaflet Maps
+        </div>
+    </footer>
+
+    <script>
+        let currentTripData = null;
+        let leafletMap = null;
+        let mapMarkers = [];
+        let mapPolyline = null;
+        let activeInputTab = 'form';
+        let apiKey = localStorage.getItem('optitrip_gemini_key') || '';
+
+        // DEMO DATA: Paris CDG to Singapore & Cambodia (11-25 April)
+        const DEMO_TRIP_DATA = {
+            title: "Évasion Asiatique : Singapour Futuriste & Merveilles du Cambodge",
+            departureCity: "Paris CDG",
+            destinations: ["Singapour", "Siem Reap (Angkor)", "Phnom Penh"],
+            datesText: "11 - 25 Avril",
+            durationDays: 14,
+            style: "Équilibré & Culturel",
+            flightDetails: {
+                outbound: "Vol Direct Paris CDG ➔ Singapour Changi (SIN) avec Singapore Airlines (A350, 12h45)",
+                inbound: "Vol Phnom Penh (PNH) ➔ Paris CDG via Bangkok (BKK) avec Thai Airways (15h30 total)",
+                layovers: "1 escale au retour (Bangkok BKK - 2h10 de correspondance)",
+                totalDuration: "~28h de vol A/R",
+                jetlag: "+6 Heures (UTC+8 à Singapour / Cambodge)"
+            },
+            climateAndBestTime: "Avril est l'une des meilleures périodes pour combiner Singapour et le Cambodge. Le temps est très ensoleillé (28-34°C). C'est également la période festive du Nouvel An Khmer (Chaul Chnam Thmey) au Cambodge (13-16 avril), idéale pour vivre les traditions locales !",
+            budgetEstimate: "~2 150 € / personne (Vols A/R ~950€, Logement 4* ~700€, Repas & Pass Angkor ~500€)",
+            localEvents: [
+                "🎊 Nouvel An Khmer (Chaul Chnam Thmey) du 13 au 16 Avril : festivités dans toutes les villes cambodgiennes.",
+                "🌸 Spectacle Floral au Flower Dome de Gardens by the Bay à Singapour.",
+                "🚤 Coucher de soleil en bateau au confluent du Mékong et du Tonlé Sap."
+            ],
+            itinerary: [
+                {
+                    day: 1,
+                    title: "Vol Aller Paris ➔ Singapour",
+                    locationName: "Paris CDG Airport",
+                    lat: 49.0097,
+                    lng: 2.5479,
+                    morning: "Départ de Paris CDG en fin de matinée.",
+                    afternoon: "Vol long-courrier direct à bord de Singapore Airlines.",
+                    evening: "Nuit à bord.",
+                    logisticsNote: "Prévoir passeport valide 6 mois après le retour. Aucun visa requis pour Singapour pour < 90 jours."
+                },
+                {
+                    day: 2,
+                    title: "Arrivée à Singapour & Marina Bay",
+                    locationName: "Marina Bay Sands, Singapour",
+                    lat: 1.2816,
+                    lng: 103.8636,
+                    morning: "Arrivée matinale à l'aéroport Changi (visite de Jewel et sa cascade géante).",
+                    afternoon: "Check-in hôtel à Marina Bay, promenade autour de la baie et Merlion Park.",
+                    evening: "Spectacle de sons et lumières 'Garden Rhapsody' aux Gardens by the Bay.",
+                    logisticsNote: "Acheter une carte EZ-Link pour les transports en MTR."
+                },
+                {
+                    day: 3,
+                    title: "Singapour Multiculturelle & Street Food",
+                    locationName: "Chinatown & Kampong Glam",
+                    lat: 1.2806,
+                    lng: 103.8448,
+                    morning: "Exploration des ruelles animées de Chinatown et du temple Buddha Tooth Relic.",
+                    afternoon: "Quartier arabe de Kampong Glam, la Mosquée Sultan et Haji Lane.",
+                    evening: "Dîner street-food légendaire au Lau Pa Sat Satay Street.",
+                    logisticsNote: "Tenue couvrante requise pour la visite des temples."
+                },
+                {
+                    day: 4,
+                    title: "Vol Singapour ➔ Siem Reap (Cambodge)",
+                    locationName: "Siem Reap Airport",
+                    lat: 13.3671,
+                    lng: 103.8448,
+                    morning: "Vol court Singapour (SIN) ➔ Siem Reap (SAI) (2h15 direct).",
+                    afternoon: "Installation au resort boutique, détente au bord de la piscine.",
+                    evening: "Première balade au Night Market et dîner sur Pub Street.",
+                    logisticsNote: "Visa Cambodge (e-Visa en ligne ou à l'arrivée ~36$). Prendre du liquide en US Dollars (USD)."
+                },
+                {
+                    day: 5,
+                    title: "Lever de Soleil sur Angkor Wat",
+                    locationName: "Angkor Wat",
+                    lat: 13.4125,
+                    lng: 103.8670,
+                    morning: "Départ à 5h00 pour le lever de soleil mythique sur le temple d'Angkor Wat.",
+                    afternoon: "Visite approfondie des bas-reliefs et galeries d'Angkor Wat.",
+                    evening: "Massage khmer traditionnel pour récupérer.",
+                    logisticsNote: "Pass Angkor 3 jours indispensable (62$). Tuk-tuk réservé pour la journée."
+                },
+                {
+                    day: 6,
+                    title: "Temples d'Angkor Thom & Ta Prohm",
+                    locationName: "Ta Prohm (Tomb Raider)",
+                    lat: 13.4348,
+                    lng: 103.8893,
+                    morning: "Visite du temple Bayon avec ses célèbres faces de pierre souriantes.",
+                    afternoon: "Exploration de Ta Prohm, le temple envahi par les racines des fromagers géants.",
+                    evening: "Spectacle de cirque contemporain cambodgien 'Phare Circus'.",
+                    logisticsNote: "Hydratation fréquente impérative (chaleur forte l'après-midi)."
+                },
+                {
+                    day: 7,
+                    title: "Nouvel An Khmer & Cité des Femmes",
+                    locationName: "Banteay Srei",
+                    lat: 13.5989,
+                    lng: 103.9631,
+                    morning: "Visite du temple de grès rose Banteay Srei aux sculpures finement travaillées.",
+                    afternoon: "Festivités du Nouvel An Khmer (jeux d'eau et danses populaires en ville).",
+                    evening: "Dîner gastronomique khmer raffiné au restaurant Cuisine Wat Damnak.",
+                    logisticsNote: "Chaul Chnam Thmey : préparez-vous à être gentiment arrosé d'eau dans les rues !"
+                },
+                {
+                    day: 8,
+                    title: "Lac Tonlé Sap & Village Flottant",
+                    locationName: "Kampong Phluk",
+                    lat: 13.2081,
+                    lng: 103.9786,
+                    morning: "Excursion vers le village sur pilotis de Kampong Phluk.",
+                    afternoon: "Balade en pirogue à travers la forêt inondée de mangroves.",
+                    evening: "Dîner tranquille à Siem Reap.",
+                    logisticsNote: "Privilégiez les agences éco-responsables locales pour l'excursion."
+                },
+                {
+                    day: 9,
+                    title: "Trajet Panoramique vers Phnom Penh",
+                    locationName: "Phnom Penh City",
+                    lat: 11.5564,
+                    lng: 104.9282,
+                    morning: "Trajet en Minivan VIP ou bus de luxe Siem Reap ➔ Phnom Penh (5h de route).",
+                    afternoon: "Arrivée dans la capitale, check-in hôtel au bord du fleuve Mékong.",
+                    evening: "Promenade sur Sisowath Quay et verre sur un rooftop avec vue fleuve.",
+                    logisticsNote: "Possibilité de prendre un vol interne Siem Reap - Phnom Penh (45 min) si préféré."
+                },
+                {
+                    day: 10,
+                    title: "Palais Royal & Pagode d'Argent",
+                    locationName: "Royal Palace Phnom Penh",
+                    lat: 11.5625,
+                    lng: 104.9317,
+                    morning: "Visite du somptueux Palais Royal et de la Pagode d'Argent au sol pavé d'argent pur.",
+                    afternoon: "Découverte du Musée National du Cambodge et de sa statuaire khmère.",
+                    evening: "Dîner au Romdeng, restaurant école formant la jeunesse locale.",
+                    logisticsNote: "Tenue stricte exigeant épaules et genoux couverts au Palais Royal."
+                },
+                {
+                    day: 11,
+                    title: "Histoire & Mémoire du Cambodge",
+                    locationName: "Tuol Sleng S21",
+                    lat: 11.5492,
+                    lng: 104.9176,
+                    morning: "Visite poignante du Musée du Génocide Tuol Sleng (S21).",
+                    afternoon: "Passage au temple emblématique Wat Phnom sur sa colline arborée.",
+                    evening: "Coucher de soleil lors d'une croisière de 2h sur le fleuve Mékong.",
+                    logisticsNote: "Audioguide recommandé à Tuol Sleng pour la compréhension historique."
+                },
+                {
+                    day: 12,
+                    title: "Marchés Art Déco & Artisanat",
+                    locationName: "Phsar Thmei (Central Market)",
+                    lat: 11.5694,
+                    lng: 104.9222,
+                    morning: "Shopping au Phsar Thmei (Marché Central Art Déco) : poivre de Kampot, soieries.",
+                    afternoon: "Visite des ateliers d'artisans d'art et du Russian Market.",
+                    evening: "Cocktails de clôture dans le quartier branché de Bassac Lane.",
+                    logisticsNote: "Négociation courtoise recommandée au marché."
+                },
+                {
+                    day: 13,
+                    title: "Détente & Derniers Souvenirs",
+                    locationName: "Phnom Penh Riverside",
+                    lat: 11.5500,
+                    lng: 104.9300,
+                    morning: "Matinée libre, spa et relaxation en piscine d'hôtel.",
+                    afternoon: "Achats de dernière minute et dégustation de café cambodgien.",
+                    evening: "Dîner de clôture au bord du fleuve.",
+                    logisticsNote: "Préparer les bagages pour le vol retour du lendemain."
+                },
+                {
+                    day: 14,
+                    title: "Vol Retour Phnom Penh ➔ Paris",
+                    locationName: "Phnom Penh Airport (PNH)",
+                    lat: 11.5466,
+                    lng: 104.8441,
+                    morning: "Transfert aéroport de Phnom Penh (PNH). Vol via Bangkok.",
+                    afternoon: "Transit à Bangkok Changi/Suvarnabhumi.",
+                    evening: "Arrivée à Paris CDG le lendemain matin.",
+                    logisticsNote: "Fin du voyage extraordinaire !"
+                }
+            ]
+        };
+
+        window.onload = function () {
+            lucide.createIcons();
+            updateApiKeyUI();
+            
+            // Auto-load Demo Trip on startup for rich initial rendering
+            loadTripData(DEMO_TRIP_DATA);
+        };
+
+        function switchInputTab(tab) {
+            activeInputTab = tab;
+            const formBtn = document.getElementById('tab-btn-form');
+            const promptBtn = document.getElementById('tab-btn-prompt');
+            const formTab = document.getElementById('input-tab-form');
+            const promptTab = document.getElementById('input-tab-prompt');
+
+            if (tab === 'form') {
+                formBtn.className = "px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-md";
+                promptBtn.className = "px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-400 hover:text-white";
+                formTab.classList.remove('hidden');
+                promptTab.classList.add('hidden');
+            } else {
+                promptBtn.className = "px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-md";
+                formBtn.className = "px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-400 hover:text-white";
+                promptTab.classList.remove('hidden');
+                formTab.classList.add('hidden');
+            }
+        }
+
+        function switchResultTab(tab) {
+            const tabs = ['map', 'planning', 'flights'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`view-tab-${t}`);
+                const content = document.getElementById(`content-tab-${t}`);
+                if (t === tab) {
+                    btn.className = "py-3 px-1 border-b-2 border-brand-500 text-brand-400 font-bold text-sm flex items-center space-x-2 whitespace-nowrap";
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = "py-3 px-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-semibold text-sm flex items-center space-x-2 whitespace-nowrap";
+                    content.classList.add('hidden');
+                }
+            });
+
+            if (tab === 'map' && leafletMap) {
+                setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+            }
+        }
+
+        function togglePlanViewMode(mode) {
+            const cardsView = document.getElementById('itinerary-cards-view');
+            const tableView = document.getElementById('itinerary-table-view');
+            const cardsBtn = document.getElementById('plan-mode-cards-btn');
+            const tableBtn = document.getElementById('plan-mode-table-btn');
+
+            if (mode === 'cards') {
+                cardsView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+                cardsBtn.className = "px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-semibold shadow";
+                tableBtn.className = "px-3 py-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-lg text-xs font-semibold";
+            } else {
+                cardsView.classList.add('hidden');
+                tableView.classList.remove('hidden');
+                tableBtn.className = "px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-semibold shadow";
+                cardsBtn.className = "px-3 py-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-lg text-xs font-semibold";
+            }
+        }
+
+        function setPromptIdea(text) {
+            document.getElementById('free-prompt-text').value = text;
+        }
+
+        function resetToHome() {
+            document.getElementById('generator-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function loadDemoTrip() {
+            loadTripData(DEMO_TRIP_DATA);
+            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function loadTripData(data) {
+            currentTripData = data;
+
+            // Header Badges & Titles
+            document.getElementById('trip-badge-dates').textContent = `${data.datesText} • ${data.durationDays} Jours`;
+            document.getElementById('trip-badge-style').textContent = data.style || 'Sur Mesure';
+            document.getElementById('trip-title').textContent = data.title;
+            document.getElementById('trip-dep-city').textContent = data.departureCity;
+            document.getElementById('trip-dest-cities').textContent = Array.isArray(data.destinations) ? data.destinations.join(', ') : data.destinations;
+
+            // Summary cards
+            document.getElementById('summary-flight-dur').textContent = data.flightDetails?.totalDuration || '~15h-25h';
+            document.getElementById('summary-flight-layover').textContent = data.flightDetails?.layovers || 'Vols sélectionnés';
+            document.getElementById('summary-jetlag').textContent = data.flightDetails?.jetlag || 'Variable';
+            document.getElementById('summary-climate-desc').textContent = data.climateAndBestTime || 'Excellente saison';
+            document.getElementById('summary-budget').textContent = data.budgetEstimate || 'Sur devis';
+
+            // Flights Tab
+            document.getElementById('flight-outbound-text').textContent = data.flightDetails?.outbound || 'Non renseigné';
+            document.getElementById('flight-inbound-text').textContent = data.flightDetails?.inbound || 'Non renseigné';
+            document.getElementById('flight-layovers-text').textContent = data.flightDetails?.layovers || 'Direct / Escales';
+            document.getElementById('flight-duration-text').textContent = data.flightDetails?.totalDuration || '12h-24h';
+
+            // Climate & Practical Tips
+            document.getElementById('climate-synthesis-content').innerHTML = `<p>${data.climateAndBestTime || ''}</p>`;
+            
+            const tipsContainer = document.getElementById('practical-tips-content');
+            tipsContainer.innerHTML = '';
+            const tipsList = data.localEvents || [
+                "Vérifiez la validité de vos passeports.",
+                "Pensez aux adaptateurs de prise électrique.",
+                "Réservez vos vols internes à l'avance."
+            ];
+            tipsList.forEach(tip => {
+                const el = document.createElement('div');
+                el.className = "p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 flex items-start space-x-2";
+                el.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-brand-400 shrink-0 mt-0.5"></i><span>${tip}</span>`;
+                tipsContainer.appendChild(el);
+            });
+
+            // Render Planning Cards & Table
+            renderItineraryViews(data.itinerary);
+
+            // Render Map
+            renderLeafletMap(data);
+
+            // Show results section
+            document.getElementById('results-section').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function renderItineraryViews(itinerary) {
+            const cardsContainer = document.getElementById('itinerary-cards-view');
+            const tableBody = document.getElementById('itinerary-table-body');
+            const mapSidebarList = document.getElementById('map-sidebar-list');
+
+            cardsContainer.innerHTML = '';
+            tableBody.innerHTML = '';
+            mapSidebarList.innerHTML = '';
+
+            document.getElementById('map-stops-count').textContent = `${itinerary.length} jours`;
+
+            itinerary.forEach((item, idx) => {
+                // 1. Render Card View
+                const card = document.createElement('div');
+                card.id = `day-card-${item.day}`;
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition space-y-3 shadow-lg";
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-8 h-8 rounded-full bg-brand-600/20 text-brand-400 font-extrabold flex items-center justify-center text-sm border border-brand-500/30">
+                                J${item.day}
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-white text-base sm:text-lg">${item.title}</h4>
+                                <span class="text-xs text-slate-400 flex items-center">
+                                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-accent-400 mr-1"></i> ${item.locationName}
+                                </span>
+                            </div>
+                        </div>
+                        <button onclick="focusMapOnDay(${item.day})" class="self-start sm:self-auto bg-slate-800 hover:bg-slate-700 text-brand-400 text-xs px-3 py-1.5 rounded-lg border border-slate-700 flex items-center space-x-1 transition no-print">
+                            <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+                            <span>Voir sur la carte</span>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs sm:text-sm pt-1">
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                            <span class="font-bold text-amber-400 flex items-center mb-1">
+                                <i data-lucide="sun" class="w-3.5 h-3.5 mr-1"></i> Matin
+                            </span>
+                            <p class="text-slate-300 leading-relaxed">${item.morning}</p>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                            <span class="font-bold text-sky-400 flex items-center mb-1">
+                                <i data-lucide="sun-medium" class="w-3.5 h-3.5 mr-1"></i> Midi & Après-midi
+                            </span>
+                            <p class="text-slate-300 leading-relaxed">${item.afternoon}</p>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                            <span class="font-bold text-purple-400 flex items-center mb-1">
+                                <i data-lucide="moon" class="w-3.5 h-3.5 mr-1"></i> Soir
+                            </span>
+                            <p class="text-slate-300 leading-relaxed">${item.evening}</p>
+                        </div>
+                    </div>
+
+                    ${item.logisticsNote ? `
+                    <div class="bg-brand-950/30 border border-brand-500/20 p-2.5 rounded-xl text-xs text-brand-300 flex items-start space-x-2">
+                        <i data-lucide="info" class="w-4 h-4 text-brand-400 shrink-0 mt-0.5"></i>
+                        <span><strong>Conseil IA / Logistique :</strong> ${item.logisticsNote}</span>
+                    </div>
+                    ` : ''}
+                `;
+                cardsContainer.appendChild(card);
+
+                // 2. Render Table View Row
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-800/50 transition";
+                row.innerHTML = `
+                    <td class="p-3 font-bold text-brand-400">J${item.day}</td>
+                    <td class="p-3 font-semibold text-white">${item.locationName}</td>
+                    <td class="p-3 text-slate-300">${item.morning}</td>
+                    <td class="p-3 text-slate-300">${item.afternoon}</td>
+                    <td class="p-3 text-slate-300">${item.evening}</td>
+                    <td class="p-3 text-slate-400 italic">${item.logisticsNote || '-'}</td>
+                `;
+                tableBody.appendChild(row);
+
+                // 3. Render Map Sidebar item
+                const sidebarItem = document.createElement('div');
+                sidebarItem.id = `map-sidebar-item-${item.day}`;
+                sidebarItem.onclick = () => focusMapOnDay(item.day);
+                sidebarItem.className = "p-2.5 bg-slate-950 hover:bg-slate-800/80 border border-slate-800/80 rounded-xl cursor-pointer transition flex items-center justify-between group";
+                sidebarItem.innerHTML = `
+                    <div class="flex items-center space-x-2 overflow-hidden">
+                        <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 group-hover:bg-brand-600 group-hover:text-white font-bold text-xs flex items-center justify-center shrink-0 transition">
+                            ${item.day}
+                        </span>
+                        <div class="truncate">
+                            <p class="text-xs font-bold text-slate-200 truncate group-hover:text-brand-400 transition">${item.title}</p>
+                            <p class="text-[11px] text-slate-400 truncate">${item.locationName}</p>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-slate-600 group-hover:text-brand-400 shrink-0 transition"></i>
+                `;
+                mapSidebarList.appendChild(sidebarItem);
+            });
+        }
+
+        function renderLeafletMap(data) {
+            if (!data.itinerary || data.itinerary.length === 0) return;
+
+            // Clear existing map instance if present
+            if (leafletMap) {
+                leafletMap.remove();
+                leafletMap = null;
+            }
+
+            mapMarkers = [];
+
+            // Initialize Map
+            const firstStop = data.itinerary[0];
+            leafletMap = L.map('map-container').setView([firstStop.lat, firstStop.lng], 5);
+
+            // OpenStreetMap dark CartoDB tiles for high aesthetic
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+                maxZoom: 18
+            }).addTo(leafletMap);
+
+            const latLngs = [];
+
+            // Add markers for each day
+            data.itinerary.forEach((item) => {
+                const isStart = item.day === 1;
+                const customIcon = L.divIcon({
+                    className: `custom-marker ${isStart ? 'start-marker' : ''}`,
+                    html: `<span>${item.day}</span>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+
+                const marker = L.marker([item.lat, item.lng], { icon: customIcon }).addTo(leafletMap);
+
+                const popupContent = `
+                    <div class="p-2 max-w-xs font-sans">
+                        <div class="text-xs font-bold text-indigo-600 uppercase">Jour ${item.day}</div>
+                        <h4 class="font-bold text-slate-900 text-sm mt-0.5">${item.title}</h4>
+                        <p class="text-xs text-slate-600 mb-2">${item.locationName}</p>
+                        <div class="text-[11px] text-slate-700 bg-slate-100 p-2 rounded space-y-1">
+                            <div><strong>🌅 Matin :</strong> ${item.morning}</div>
+                            <div><strong>☀️ Après-Midi :</strong> ${item.afternoon}</div>
+                            <div><strong>🌙 Soir :</strong> ${item.evening}</div>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                
+                marker.on('click', () => {
+                    highlightSidebarDay(item.day);
+                });
+
+                mapMarkers.push({ day: item.day, marker: marker });
+                latLngs.push([item.lat, item.lng]);
+            });
+
+            // Polyline route connection
+            if (latLngs.length > 1) {
+                mapPolyline = L.polyline(latLngs, {
+                    color: '#6366f1',
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '6, 8'
+                }).addTo(leafletMap);
+
+                // Fit bounds to show all itinerary points
+                leafletMap.fitBounds(mapPolyline.getBounds(), { padding: [40, 40] });
+            }
+        }
+
+        function focusMapOnDay(day) {
+            // Switch to map tab first
+            switchResultTab('map');
+
+            const item = mapMarkers.find(m => m.day === day);
+            if (item && leafletMap) {
+                leafletMap.flyTo(item.marker.getLatLng(), 11, { duration: 1.2 });
+                item.marker.openPopup();
+                highlightSidebarDay(day);
+            }
+        }
+
+        function highlightSidebarDay(day) {
+            // Highlight in sidebar list
+            document.querySelectorAll('[id^="map-sidebar-item-"]').forEach(el => {
+                el.classList.remove('border-brand-500', 'bg-slate-800');
+            });
+            const activeSidebar = document.getElementById(`map-sidebar-item-${day}`);
+            if (activeSidebar) {
+                activeSidebar.classList.add('border-brand-500', 'bg-slate-800');
+                activeSidebar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Highlight marker
+            mapMarkers.forEach(m => {
+                const el = m.marker.getElement();
+                if (el) {
+                    if (m.day === day) {
+                        el.classList.add('active');
+                    } else {
+                        el.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        function filterItineraryDays() {
+            const query = document.getElementById('filter-day-input').value.toLowerCase();
+            if (!currentTripData) return;
+
+            currentTripData.itinerary.forEach(item => {
+                const card = document.getElementById(`day-card-${item.day}`);
+                const match = item.title.toLowerCase().includes(query) || 
+                              item.locationName.toLowerCase().includes(query) ||
+                              item.morning.toLowerCase().includes(query) ||
+                              item.afternoon.toLowerCase().includes(query);
+                if (card) {
+                    card.style.display = match ? 'block' : 'none';
+                }
+            });
+        }
+
+        async function generateItinerary() {
+            const btn = document.getElementById('generate-btn');
+            const spinner = document.getElementById('loading-spinner');
+            const results = document.getElementById('results-section');
+
+            // Build User Prompt based on active tab
+            let userPromptText = "";
+            let depCity = "";
+            let destCities = "";
+
+            if (activeInputTab === 'form') {
+                depCity = document.getElementById('form-departure').value || "Paris";
+                destCities = document.getElementById('form-destinations').value || "Destination populaire";
+                const dateType = document.getElementById('form-date-type').value;
+                const datesText = document.getElementById('form-dates-text').value;
+                const duration = document.getElementById('form-duration').value || "10";
+                const style = document.getElementById('form-style').value;
+                const budget = document.getElementById('form-budget').value;
+                const group = document.getElementById('form-group').value;
+
+                userPromptText = `Crée un itinéraire complet de voyage de ${duration} jours.
+                Ville de départ : ${depCity}.
+                Destinations : ${destCities}.
+                Période / Dates : ${datesText} (Mode : ${dateType}).
+                Style de voyage : ${style}.
+                Budget : ${budget}.
+                Voyageurs : ${group}.
+                Merci de fournir la meilleure combinaison de vols, escales, décalage horaire, climat et un itinéraire jour par jour détaillé avec coordonnées latitude/longitude précises pour chaque étape.`;
+            } else {
+                userPromptText = document.getElementById('free-prompt-text').value;
+                if (!userPromptText.trim()) {
+                    alert("Veuillez saisir votre demande de voyage dans la zone de texte.");
+                    return;
+                }
+            }
+
+            // If no API key provided, fallback to smooth demo mode with notice
+            if (!apiKey) {
+                alert("Aucune clé API Gemini renseignée. Chargement de l'itinéraire démo optimisé ! (Entrez votre clé dans le menu 'Clé API' pour générer n'importe quelle destination).");
+                loadDemoTrip();
+                return;
+            }
+
+            // Show Loading UI
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            spinner.classList.remove('hidden');
+            results.classList.add('hidden');
+
+            const systemInstruction = `Tu es OptiTrip, un expert mondial en planification et optimisation de voyages. 
+            Ton rôle est de fournir un plan de voyage structuré et ultra-précis au format JSON strict.
+            Tu dois calculer les vols optimaux (durée globale, escales probables, jetlag), le climat synthétisé et un programme jour par jour.
+            Pour chaque jour, tu DOIS obligatoirement fournir un nom de lieu précis, une latitude et une longitude valides pour positionner le point sur la carte OpenStreetMap.`;
+
+            const jsonSchema = {
+                type: "OBJECT",
+                properties: {
+                    title: { type: "STRING" },
+                    departureCity: { type: "STRING" },
+                    destinations: { type: "ARRAY", items: { type: "STRING" } },
+                    datesText: { type: "STRING" },
+                    durationDays: { type: "NUMBER" },
+                    style: { type: "STRING" },
+                    flightDetails: {
+                        type: "OBJECT",
+                        properties: {
+                            outbound: { type: "STRING" },
+                            inbound: { type: "STRING" },
+                            layovers: { type: "STRING" },
+                            totalDuration: { type: "STRING" },
+                            jetlag: { type: "STRING" }
+                        },
+                        required: ["outbound", "inbound", "layovers", "totalDuration", "jetlag"]
+                    },
+                    climateAndBestTime: { type: "STRING" },
+                    budgetEstimate: { type: "STRING" },
+                    localEvents: { type: "ARRAY", items: { type: "STRING" } },
+                    itinerary: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                day: { type: "NUMBER" },
+                                title: { type: "STRING" },
+                                locationName: { type: "STRING" },
+                                lat: { type: "NUMBER" },
+                                lng: { type: "NUMBER" },
+                                morning: { type: "STRING" },
+                                afternoon: { type: "STRING" },
+                                evening: { type: "STRING" },
+                                logisticsNote: { type: "STRING" }
+                            },
+                            required: ["day", "title", "locationName", "lat", "lng", "morning", "afternoon", "evening"]
+                        }
+                    }
+                },
+                required: ["title", "departureCity", "destinations", "durationDays", "flightDetails", "climateAndBestTime", "itinerary"]
+            };
+
+            const payload = {
+                contents: [{ parts: [{ text: userPromptText }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: jsonSchema
+                }
+            };
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            try {
+                // Exponential backoff fetch
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (jsonText) {
+                    const parsedData = JSON.parse(jsonText);
+                    loadTripData(parsedData);
+                    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    throw new Error("Format de réponse invalide de Gemini");
+                }
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                alert("Erreur lors de la génération avec l'API Gemini. Chargement du mode Démo.");
+                loadDemoTrip();
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                spinner.classList.add('hidden');
+            }
+        }
+
+        async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return response;
+                } catch (e) {
+                    if (i === retries - 1) throw e;
+                }
+                await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+            }
+            return fetch(url, options);
+        }
+
+        function toggleApiKeyModal() {
+            const modal = document.getElementById('modal-apikey');
+            modal.classList.toggle('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            apiKey = key;
+            localStorage.setItem('optitrip_gemini_key', key);
+            updateApiKeyUI();
+            toggleApiKeyModal();
+        }
+
+        function updateApiKeyUI() {
+            const txt = document.getElementById('api-key-status-text');
+            if (apiKey) {
+                txt.textContent = "Clé API Active";
+                txt.className = "text-brand-400 font-semibold";
+            } else {
+                txt.textContent = "Clé API (Optionnelle)";
+                txt.className = "text-slate-400";
+            }
+        }
+
+        function saveCurrentTrip() {
+            if (!currentTripData) return;
+            let saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
+            
+            // Check if already saved
+            const exists = saved.some(t => t.title === currentTripData.title);
+            if (!exists) {
+                saved.push({
+                    id: Date.now(),
+                    savedAt: new Date().toLocaleDateString('fr-FR'),
+                    data: currentTripData
+                });
+                localStorage.setItem('optitrip_saved_trips', JSON.stringify(saved));
+                alert("Voyage sauvegardé avec succès dans votre navigateur !");
+            } else {
+                alert("Ce voyage est déjà enregistré dans votre bibliothèque.");
+            }
+        }
+
+        function toggleSavedTripsModal() {
+            const modal = document.getElementById('modal-saved-trips');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                renderSavedTripsList();
+            }
+        }
+
+        function renderSavedTripsList() {
+            const list = document.getElementById('saved-trips-list');
+            const saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
+            list.innerHTML = '';
+
+            if (saved.length === 0) {
+                list.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Aucun voyage sauvegardé pour le moment.</p>';
+                return;
+            }
+
+            saved.forEach(item => {
+                const el = document.createElement('div');
+                el.className = "p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between hover:border-slate-700 transition";
+                el.innerHTML = `
+                    <div>
+                        <h5 class="text-xs font-bold text-white">${item.data.title}</h5>
+                        <span class="text-[11px] text-slate-400">${item.data.departureCity} ➔ ${item.data.durationDays}j • Sauvegardé le ${item.savedAt}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="loadSavedTripById(${item.id})" class="bg-brand-600 hover:bg-brand-500 text-white text-xs px-2.5 py-1 rounded-lg">Ouvrir</button>
+                        <button onclick="deleteSavedTripById(${item.id})" class="text-slate-500 hover:text-red-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+            lucide.createIcons();
+        }
+
+        function loadSavedTripById(id) {
+            const saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
+            const item = saved.find(t => t.id === id);
+            if (item) {
+                loadTripData(item.data);
+                toggleSavedTripsModal();
+                document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function deleteSavedTripById(id) {
+            let saved = JSON.parse(localStorage.getItem('optitrip_saved_trips') || '[]');
+            saved = saved.filter(t => t.id !== id);
+            localStorage.setItem('optitrip_saved_trips', JSON.stringify(saved));
+            renderSavedTripsList();
+        }
+
+        function toggleDateInputs() {
+            const type = document.getElementById('form-date-type').value;
+            const datesInput = document.getElementById('form-dates-text');
+            if (type === 'flexible') {
+                datesInput.value = "Printemps / Avril (Meilleure période)";
+            } else {
+                datesInput.value = "11 au 25 Avril";
+            }
+        }
+    </script>
+</body>
+</html>
